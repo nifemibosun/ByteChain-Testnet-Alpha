@@ -1,3 +1,4 @@
+import { Address } from "bc-web3js";
 import {
     BLOCK_REWARD, BLOCK_TIME_DIFF,
     MIN_DIFFICULTY, MAX_DIFFICULTY,
@@ -18,12 +19,12 @@ class BlockChain {
     tx_pool: Transaction[];
     chain: Block[];
     difficulty: number = MIN_DIFFICULTY;
-    addr_state: Map<string, AccState>;
+    addr_state: Map<Address, AccState>;
 
     constructor() {
         this.tx_pool = [];
         this.chain = [];
-        this.addr_state = new Map<string, AccState>();
+        this.addr_state = new Map<Address, AccState>();
         this.genesis_block();
     }
 
@@ -42,37 +43,37 @@ class BlockChain {
         this.difficulty = this.calc_difficulty();
     }
 
-    ensure_account(addr: string) {
+    ensure_account(addr: Address) {
         if (!this.addr_state.has(addr)) {
             this.addr_state.set(addr, { nonce: 0, balance: 0 });
         }
     }
 
-    get_nonce(addr: string) {
+    get_nonce(addr: Address) {
         this.ensure_account(addr);
         const state = this.addr_state.get(addr)!;
         return state.nonce;
     }
 
-    get_balance(addr: string) {
+    get_balance(addr: Address) {
         this.ensure_account(addr);
         const state = this.addr_state.get(addr)!;
         return state.balance;
     }
 
-    update_nonce(addr: string) {
+    update_nonce(addr: Address) {
         this.ensure_account(addr);
         const state = this.addr_state.get(addr)!;
         state.nonce += 1;
     }
 
-    credit_addr(addr: string, amount: number) {
+    credit_addr(addr: Address, amount: number) {
         this.ensure_account(addr);
         const state = this.addr_state.get(addr)!;
         state.balance += amount;
     }
 
-    debit_addr(addr: string, amount: number) {
+    debit_addr(addr: Address, amount: number) {
         this.ensure_account(addr);
         const state = this.addr_state.get(addr)!;
         if (state.balance < amount) throw new Error("Insufficient balance");
@@ -131,6 +132,7 @@ class BlockChain {
             if (!tx.verify_tx_sig()) throw new Error("Invalid Transaction signature");
             
             this.tx_pool.push(tx);
+            this.debit_addr(tx.sender, tx.amount + tx.fee);
 
             return tx;
         } catch (err) {
@@ -152,7 +154,6 @@ class BlockChain {
             
             for (const tx of transactions) {
                 this.update_nonce(tx.sender);
-                this.debit_addr(tx.sender, tx.amount + tx.fee);
                 this.credit_addr(tx.recipient, tx.amount);
             }
 
@@ -166,7 +167,7 @@ class BlockChain {
         }
     }
 
-    mine_block(miner_addr: string): Block {
+    mine_block(miner_addr: Address): Block {
         try {
             const reward_tx = new Transaction(BLOCK_REWARD, BC_NAME, miner_addr, 0, Date.now(), BC_NAME_PUB, "", 0);
 

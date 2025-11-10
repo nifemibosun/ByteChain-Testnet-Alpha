@@ -13,16 +13,6 @@ const BLOCK_WINDOW_FEE: number = 10;
 
 const VANITY_ADDR: string = "00000000000000000000000000000000000000000";
 
-interface BlockHeader {
-    nonce: number;
-    block_height: number;
-    timestamp: number;
-    merkleroot: string;
-    prev_block_hash: string;
-    block_hash: string;
-    difficulty: number;
-}
-
 const print = (...data: any): void => {
     console.dir(...data, { depth: null, colors: true });
 }
@@ -34,5 +24,5 @@ export {
     VANITY_ADDR, BLOCK_WINDOW_FEE,
     GEN_PREV_HASH, BLOCK_WINDOW_DIFF, 
     MIN_DIFFICULTY, MAX_DIFFICULTY, 
-    MAX_NONCE_ATTEMPTS, BlockHeader, print
+    MAX_NONCE_ATTEMPTS, print
 };
