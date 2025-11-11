@@ -2,11 +2,11 @@ import fs from "fs";
 import express from "express";
 import { Request, Response } from "express";
 import cors from "cors";
+import { Account, Address } from "bc-web3js";
 import P2PNode from "../network/p2p.js";
 import BlockChain from "./blockchain.js";
 import Transaction from "./transaction.js";
 import { print } from "../utils/constants.js";
-import Account from "../accounts/account.js";
 import { Server } from "socket.io";
 
 
@@ -28,7 +28,7 @@ function read_file() {
 class BCNode {
     private p2p_port: number;
     private api_port: number;
-    private miner_addr: string;
+    private miner_addr: Address;
     private bytechain: BlockChain;
     private p2p: P2PNode;
     public app: express.Application;

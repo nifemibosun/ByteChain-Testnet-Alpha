@@ -1,5 +1,6 @@
 import base58 from "bs58";
 import elliptic_pkg from 'elliptic';
+import { Address, PrivKey, PubKey } from "bc-web3js";
 import { MAX_TIME_DIFF_TX, BC_NAME } from "../utils/constants.js";
 import { hash_tobuf, hash_tostr } from "../utils/crypto.js";
 
@@ -10,22 +11,22 @@ const ec = new EC('secp256k1');
 
 class Transaction {
     amount: number;
-    sender: string;
-    recipient: string;
+    sender: Address;
+    recipient: Address;
     fee: number;
     tx_id: string;
     signature: string;
     nonce: number;
     timestamp: number;
-    publicKey: string;
+    publicKey: PubKey;
 
     constructor(
         amount: number,
-        sender: string,
-        recipient: string,
+        sender: Address,
+        recipient: Address,
         fee: number,
         timestamp: number,
-        publicKey: string,
+        publicKey: PubKey,
         signature: string,
         nonce: number,
     ) {
@@ -80,7 +81,7 @@ class Transaction {
         }
     }
 
-    sign_tx(priv_key: string): Transaction {
+    sign_tx(priv_key: PrivKey): Transaction {
         try {
             const data_str = this.get_signing_data();
             
