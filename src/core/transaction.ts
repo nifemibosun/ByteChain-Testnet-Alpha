@@ -1,8 +1,9 @@
 import base58 from "bs58";
 import elliptic_pkg from 'elliptic';
-import { Address, PrivKey, PubKey } from "bc-web3js";
+import type { Address, PrivKey, PubKey } from "bc-web3js";
 import { MAX_TIME_DIFF_TX, BC_NAME } from "../utils/constants.js";
 import { hash_tobuf, hash_tostr } from "../utils/crypto.js";
+import { serialize_tx, toJSON } from "../utils/serialization.js";
 
 
 const  { ec: EC } = elliptic_pkg;
@@ -10,15 +11,15 @@ const ec = new EC('secp256k1');
 
 
 class Transaction {
-    amount: number;
-    sender: Address;
-    recipient: Address;
-    fee: number;
-    tx_id: string;
-    signature: string;
-    nonce: number;
-    timestamp: number;
-    publicKey: PubKey;
+    public amount: number;
+    public sender: Address;
+    public recipient: Address;
+    public fee: number;
+    public timestamp: number;
+    public tx_id: string;
+    public nonce: number;
+    public publicKey: PubKey;
+    public signature: string;
 
     constructor(
         amount: number,
@@ -26,23 +27,23 @@ class Transaction {
         recipient: Address,
         fee: number,
         timestamp: number,
+        nonce: number,
         publicKey: PubKey,
         signature: string,
-        nonce: number,
     ) {
         this.amount = amount;
         this.sender = sender;
         this.recipient = recipient;
         this.fee = fee;
         this.timestamp = timestamp;
+        this.tx_id = this.compute_tx_id();
+        this.nonce = nonce;
         this.publicKey = publicKey;
         this.signature = signature;
-        this.nonce = nonce;
-        this.tx_id = this.compute_tx_id();;
     }
 
     private get_signing_data(): string {
-        return `${this.amount}${this.sender}${this.recipient}${this.fee}${this.publicKey}${this.nonce}${this.timestamp}`;
+        return toJSON(serialize_tx(this));
     }
 
     private compute_tx_id(): string {
@@ -64,6 +65,10 @@ class Transaction {
         }
         
         try {
+            if (typeof signature !== 'string') {
+                throw new Error("signature must be a base58 string");
+            }
+
             const tx_data_str = this.get_signing_data();
         
             const base58_sig = signature
@@ -97,7 +102,7 @@ class Transaction {
 
             return this;
         } catch (err) {
-            throw new Error('Unable to sign transaction from tx-class');
+            throw new Error('Unable to sign transaction');
         }
     }
 
@@ -106,7 +111,7 @@ class Transaction {
             const currentTime = Date.now();
             
             if (Math.abs(currentTime - this.timestamp) > MAX_TIME_DIFF_TX) {
-                throw new Error('Transaction timestamp is too old or in future');
+                throw new Error('Transaction timestamp is too old');
             }
 
             return this.verify_tx_sig();

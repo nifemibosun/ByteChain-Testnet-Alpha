@@ -1,8 +1,8 @@
 import fs from "fs";
-import express from "express";
-import { Request, Response } from "express";
 import cors from "cors";
-import { Account, Address } from "bc-web3js";
+import express from "express";
+import type { Request, Response } from "express";
+import { Account, type Address } from "bc-web3js";
 import P2PNode from "../network/p2p.js";
 import BlockChain from "./blockchain.js";
 import Transaction from "./transaction.js";
@@ -70,8 +70,8 @@ class BCNode {
 
                 const tx_result = this.bytechain.add_new_tx(new_tx);
                 if (tx_result) {
-                    this.p2p.publishTransaction(new_tx);
-                    return res.status(200).json({ status: "success", msg: "Transaction added successfully." });
+                    this.p2p.publish_tx(new_tx);
+                    return res.status(200).json({ status: "success", msg: `Tx id: ${new_tx.tx_id}` });
                 } else {
                     return res
                         .status(200)
@@ -84,14 +84,14 @@ class BCNode {
         });
 
         this.app.get("/balance/:address", (req: Request, res: Response) => {
-            const addr = req.params.address;
+            const addr = req.params.address.toString();
 
             const balance = this.bytechain.get_balance(addr);
             res.status(200).json({ address: addr, balance });
         });
 
         this.app.get("/nonce/:address", (req: Request, res: Response) => {
-            const addr = req.params.address;
+            const addr = req.params.address.toString();
 
             const nonce = this.bytechain.get_nonce(addr);
             res.status(200).json({ address: addr, nonce });
@@ -106,6 +106,10 @@ class BCNode {
             res.status(200).json(this.bytechain.chain);
         });
 
+        this.app.get("/chain/latest", (_: Request, res: Response) => {
+            res.status(200).json(this.bytechain.get_latest_block());
+        });
+
         this.app.get("/chain/:number", (req: Request, res: Response) => {
             const block_num = Number(req.params.number);
             if (
@@ -114,9 +118,30 @@ class BCNode {
                 block_num < 0 ||
                 block_num >= this.bytechain.chain.length
             ) {
-                return res.status(400).json({ status: "error", msg: "Invalid block number" });
+                return res.status(400).json({ status: "error", msg: `Error: Invalid block number '${block_num}'` });
             }
-            res.status(200).json(this.bytechain.chain[block_num]);
+
+            return res.status(200).json(this.bytechain.chain[block_num]);
+        });
+
+        this.app.get("/chain/:start/:end", (req: Request, res: Response) => {
+            const block_start = Number(req.params.start);
+            const block_end = Number(req.params.end);
+
+            if (
+                isNaN(block_start) || !Number.isInteger(block_start) ||
+                block_start < 0 || block_start >= this.bytechain.chain.length ||
+                isNaN(block_end) || !Number.isInteger(block_end) ||
+                block_end < 0 || block_end >= this.bytechain.chain.length
+            ) {
+                return res.status(400).json({ status: "error", msg: "Error: Chain does not include such blocks" });
+            }
+
+            if (block_start > block_end) {
+                return res.status(400).json({ status: "error", msg: "Error: start must be <= end" });
+            }
+
+            return res.status(200).json(this.bytechain.get_multiple_blocks(block_start, block_end));
         });
 
         this.app.get("/tx/pool", (_: Request, res: Response) => {
@@ -137,14 +162,13 @@ class BCNode {
 
     async start(server?: any) {
         await this.p2p.start(this.p2p_port);
-        await this.p2p.subscribeToTopics();
 
         if (server) {
             server
                 .listen(this.api_port, () => {
                   print(`ByteChain HTTP server started on port ${this.api_port}`);
                 })
-                .on("error", (err: any) => {
+                .on("error", (_: any) => {
                   print(`Failed to start HTTP server on port ${this.api_port}`);
                   process.exit(1);
                 });
@@ -153,14 +177,11 @@ class BCNode {
                 .listen(this.api_port, () => {
                   print(`ByteChain HTTP server started on port ${this.api_port}`);
                 })
-                .on("error", (err: any) => {
+                .on("error", (_: any) => {
                   print(`Failed to start HTTP server on port ${this.api_port}`);
                   process.exit(1);
                 });
         }
-
-        print(`ByteChain P2P Node started with peer ID: ${this.p2p.node.peerId.toString()}`);
-        print(`Listening on: ${this.p2p.node.getMultiaddrs().map((ma: any) => ma.toString())}`);
     }
 
     async stop() {
@@ -168,20 +189,20 @@ class BCNode {
         print("P2P and HTTP server stopped");
     }
 
-    pubTx(tx: Transaction) {
+    pub_tx(tx: Transaction) {
         const result = this.bytechain.add_new_tx(tx);
         if (result) {
-            this.p2p.publishTransaction(tx);
+            this.p2p.publish_tx(tx);
         } else {
             console.error("Failed to add transaction to tx_pool.");
         }
     }
 
-    pubBlock() {
+    pub_block() {
         try {
             const new_block = this.bytechain.mine_block(this.miner_addr);
             if (new_block) {
-                this.p2p.publishBlock(new_block);
+                this.p2p.publish_block(new_block);
                 if (this.io) {
                     this.io.emit("blockMined", new_block);
                 }

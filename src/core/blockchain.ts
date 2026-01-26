@@ -1,9 +1,9 @@
-import { Address } from "bc-web3js";
+import type { Address } from "bc-web3js";
 import {
     BLOCK_REWARD, BLOCK_TIME_DIFF,
     MIN_DIFFICULTY, MAX_DIFFICULTY,
     BLOCK_WINDOW_DIFF, BLOCK_WINDOW_FEE,
-    GEN_PREV_HASH, BC_NAME, BC_NAME_PUB,
+    GEN_PREV_HASH, BC_NAME,
     VANITY_ADDR
 } from "../utils/constants.js";
 import Transaction from "./transaction.js";
@@ -31,7 +31,7 @@ class BlockChain {
     genesis_block() {
         const gen_amount = 1000000000;
         const gen_recipient = "BC-GEN";
-        const tx = new Transaction(gen_amount, BC_NAME, gen_recipient, 0, Date.now(), BC_NAME_PUB, "", 0)
+        const tx = new Transaction(gen_amount, BC_NAME, gen_recipient, 0, Date.now(), 0, "", "")
         this.tx_pool.push(tx);
         const txs = this.tx_pool;
         const new_block = new Block(0, MIN_DIFFICULTY, GEN_PREV_HASH, txs);
@@ -80,25 +80,32 @@ class BlockChain {
         state.balance -= amount;
     }
 
-    get_last_block(): Block {
+    get_latest_block(): Block {
         const last_block = this.chain[this.chain.length - 1];
         return last_block;
     }
 
-    get_latest_blocks(window: number): Block[] {
+    get_multiple_blocks(start: number, end: number): Block[] {
         let latest_blocks: Block[] = [];
-        const start = Math.max(0, this.chain.length - window);
 
-        for (let c = start; c < this.chain.length; c++) {
-            let n_block = this.chain[c];
-            latest_blocks.push(n_block);
+        if ((start || end) < 0) {
+            throw new Error("Invalid chain index");
+        }
+
+        if (!this.chain[start] || !this.chain[end]) {
+            throw new Error("Chain is not long enough");
+        }
+
+        for (let c = start; c <= this.chain[end].block_header.block_height; c++) {
+            let c_block = this.chain[c];
+            latest_blocks.push(c_block);
         }
         
         return latest_blocks;
     }
 
     calculate_dynamic_fee() {
-        const recent_blocks = this.get_latest_blocks(BLOCK_WINDOW_FEE);
+        const recent_blocks = this.get_multiple_blocks(this.chain.length - BLOCK_WINDOW_FEE, this.chain.length);
 
         if (recent_blocks.length === 0) return 0.001;
         
@@ -142,13 +149,13 @@ class BlockChain {
 
     add_new_block(): Block {
         try {
-            const { block_height, block_hash } = this.get_last_block().block_header;
+            const { block_height, block_hash } = this.get_latest_block().block_header;
             const n_block_height = block_height + 1;
 
             let t_fee = 0;
             for (const tx of this.tx_pool) t_fee += tx.fee;
 
-            const fee_tx = new Transaction(t_fee, BC_NAME, VANITY_ADDR, 0, Date.now(), BC_NAME_PUB, "", 0);
+            const fee_tx = new Transaction(t_fee, BC_NAME, VANITY_ADDR, 0, Date.now(), 0, "", "");
             this.add_new_tx(fee_tx);
             const transactions = this.tx_pool;
             
@@ -169,7 +176,7 @@ class BlockChain {
 
     mine_block(miner_addr: Address): Block {
         try {
-            const reward_tx = new Transaction(BLOCK_REWARD, BC_NAME, miner_addr, 0, Date.now(), BC_NAME_PUB, "", 0);
+            const reward_tx = new Transaction(BLOCK_REWARD, BC_NAME, miner_addr, 0, Date.now(), 0, "", "");
 
             this.add_new_tx(reward_tx);
 
@@ -192,7 +199,7 @@ class BlockChain {
             }
 
             const prev_block_header = this.chain[this.chain.length - BLOCK_WINDOW_DIFF].block_header;
-            const n_block_header = this.get_last_block().block_header;
+            const n_block_header = this.get_latest_block().block_header;
             const time_diff = n_block_header.timestamp - prev_block_header.timestamp;
 
             if (time_diff < BLOCK_TIME_DIFF) {
@@ -215,22 +222,27 @@ class BlockChain {
     }
 
     sync_chain(remote: Block[]) {
+        let local = this.chain;
+
         if (remote.length > this.chain.length) {
             BlockChain.is_valid_chain(remote);
-            this.chain = remote;
-
             this.addr_state.clear();
-            for (const block of this.chain) {
+
+            for (const block of remote) {
                 for (const tx of block.transactions) {
-                    if (tx.sender !== BC_NAME) {
-                        this.update_nonce(tx.sender);
-                        this.debit_addr(tx.sender, tx.amount + tx.fee);
+                    if (tx.sender === BC_NAME) {
+                        this.credit_addr(tx.recipient, tx.amount);
                     }
-                    
+
+                    this.update_nonce(tx.sender);
+                    this.debit_addr(tx.sender, tx.amount + tx.fee);
                     this.credit_addr(tx.recipient, tx.amount);
                 }
             }
+            this.chain = remote;
         }
+
+        this.chain = local;
     }
 }
 
