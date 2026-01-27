@@ -1,4 +1,4 @@
-import { BlockHeader }  from "bc-web3js";
+import type { BlockHeader }  from "bc-web3js";
 import proof_of_work from "../consensus/pow.js";
 import Transaction from "./transaction.js";
 import calc_merkleroot from "./merkleroot.js";
@@ -13,17 +13,23 @@ class Block {
             nonce: 0,
             block_height: block_height,
             timestamp: 0,
+            difficulty: difficulty,
             merkleroot: "",
             prev_block_hash: prev_block_hash,
             block_hash: "",
-            difficulty: difficulty,
         };
         this.transactions = transactions;
     }
 
     get_base_hash_input(): string {
         const { block_height, timestamp, difficulty, merkleroot,  prev_block_hash } = this.block_header;
-        return `${block_height}${timestamp}${difficulty}${merkleroot}${prev_block_hash}`;
+        return `
+            ${block_height}
+            ${timestamp}
+            ${difficulty}
+            ${merkleroot}
+            ${prev_block_hash}
+        `;
     }
 
     set_block_props(): { n_nonce: number, hash: string } {

@@ -1,5 +1,5 @@
 import BCNode from "./core/node.js";
-import { print } from "./utils/constants.js";
+import { BLOCK_TIME, print } from "./utils/constants.js";
 import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
@@ -18,11 +18,11 @@ async function main() {
     server.listen(3000, () => {});
 
     setInterval(() => {
-        bc_node.pubBlock();
-    }, 2000);
+        bc_node.pub_block();
+    }, BLOCK_TIME);
 }
 
-main().catch((err) => {
+main().catch((err: any) => {
     console.error(`Failed to start ByteChain Node: ${err}`);
     process.exit(1);
 });
