@@ -30,20 +30,7 @@ class P2PNode {
         this.blockchain = blockchainInstance;
     }
 
-    async start(port: number, bootstrap_peers: string[] = []) {
-        const peer_discovery_config: any[] = [
-            mdns({ interval: 20e3 })
-        ];
-
-        if (bootstrap_peers.length > 0) {
-            print(`Configuring bootstrap with ${bootstrap_peers.length} peer(s)...`);
-            peer_discovery_config.push(
-                bootstrap({
-                    list: bootstrap_peers
-                })
-            );
-        }
-
+    async start(port: number) {
         this.node = await createLibp2p({
             addresses: {
                 listen: [
@@ -58,7 +45,17 @@ class P2PNode {
             ],
             connectionEncrypters: [noise()],
             streamMuxers: [yamux()],
-            peerDiscovery: peer_discovery_config,
+            peerDiscovery: [
+                mdns({ interval: 20e3 }),
+                bootstrap({
+                    list: [
+                        "/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
+                        "/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
+                        "/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb",
+                        "/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt"
+                    ]
+                })
+            ],
             services: {
                 identify: identify(),
                 ping: ping(),
@@ -121,7 +118,19 @@ class P2PNode {
             const peer_id = evt.detail;
             await this.sync_remote_chain(peer_id);
             await this.request_mempool(peer_id);
-            print(`Connected to peer: ${peer_id.toString()}`);
+            print(`Connected to: ${peer_id.toString()}`);
+        });
+
+        this.node.addEventListener('peer:identify', async (evt: any) => {
+            const { peerId, protocols } = evt.detail;
+            
+            const is_bytechain_peer = protocols.includes(this.CHAIN_SYNC_PROTOCOL);
+            
+            if (is_bytechain_peer) {
+                print(`ByteChain peer identified: ${peerId.toString()}`);
+                await this.sync_remote_chain(peerId);
+                await this.request_mempool(peerId);
+            }
         });
 
         this.node.addEventListener('peer:disconnect', (evt: any) => {

@@ -1,6 +1,6 @@
 {
     "name": "bytechain-testnet-alpha",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "This is the first testnet of the bytechain network",
     "type": "module",
     "scripts": {
@@ -26,7 +26,7 @@
         "@libp2p/mdns": "^11.0.46",
         "@libp2p/tcp": "^10.1.17",
         "@libp2p/websockets": "^9.2.18",
-        "bc-web3js": "^2.5.1",
+        "bc-web3js": "^3.1.0",
         "bs58": "^6.0.0",
         "cors": "^2.8.5",
         "elliptic": "^6.6.0",

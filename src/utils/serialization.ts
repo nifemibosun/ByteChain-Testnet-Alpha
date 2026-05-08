@@ -15,10 +15,9 @@ function serialize_tx(tx: Transaction): Record<string, any> {
         sender: tx.sender,
         recipient: tx.recipient,
         fee: tx.fee,
-        signature: tx.signature,
-        nonce: tx.nonce,
         timestamp: tx.timestamp,
-        publicKey: tx.publicKey,
+        nonce: tx.nonce,
+        signature: tx.signature
     };
 
     return obj;
@@ -37,10 +36,9 @@ function deserialize_tx(data: Record<string, any>): Transaction {
         data.sender === undefined ||
         data.recipient === undefined ||
         data.fee === undefined ||
-        data.signature === undefined ||
-        data.nonce === undefined ||
         data.timestamp === undefined ||
-        data.publicKey === undefined
+        data.nonce === undefined ||
+        data.signature === undefined
     ) {
         throw new Error('Missing essential transaction data during deserialization.');
     }
@@ -50,10 +48,9 @@ function deserialize_tx(data: Record<string, any>): Transaction {
         data.sender,
         data.recipient,
         data.fee,
-        data.publicKey,
-        data.signature,
-        data.nonce,
         data.timestamp,
+        data.nonce,
+        data.signature,
     );
 
     return tx;
@@ -82,7 +79,7 @@ function serialize_block(block: Block): Record<string, any> {
 }
 
 /**
- * Deserializes a plain JavaScript object (or parsed JSON) back into a Block object.
+ * Deserializes a plain TS object (or parsed JSON) back into a Block object.
  * This includes deserializing all nested Transaction objects.
  *
  * @param data The plain object (or parsed JSON) representing a block.

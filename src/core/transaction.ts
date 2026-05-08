@@ -1,9 +1,8 @@
 import base58 from "bs58";
 import elliptic_pkg from 'elliptic';
-import type { Address, PrivKey, PubKey } from "bc-web3js";
+import type { PubKey } from "bc-web3js";
 import { MAX_TIME_DIFF_TX, BC_NAME } from "../utils/constants.js";
 import { hash_tobuf, hash_tostr } from "../utils/crypto.js";
-import { serialize_tx, toJSON } from "../utils/serialization.js";
 
 
 const  { ec: EC } = elliptic_pkg;
@@ -12,23 +11,21 @@ const ec = new EC('secp256k1');
 
 class Transaction {
     public amount: number;
-    public sender: Address;
-    public recipient: Address;
+    public sender: PubKey;
+    public recipient: PubKey;
     public fee: number;
     public timestamp: number;
     public tx_id: string;
     public nonce: number;
-    public publicKey: PubKey;
     public signature: string;
 
     constructor(
         amount: number,
-        sender: Address,
-        recipient: Address,
+        sender: PubKey,
+        recipient: PubKey,
         fee: number,
         timestamp: number,
         nonce: number,
-        publicKey: PubKey,
         signature: string,
     ) {
         this.amount = amount;
@@ -38,12 +35,11 @@ class Transaction {
         this.timestamp = timestamp;
         this.tx_id = this.compute_tx_id();
         this.nonce = nonce;
-        this.publicKey = publicKey;
         this.signature = signature;
     }
 
     private get_signing_data(): string {
-        return toJSON(serialize_tx(this));
+        return `${this.amount}${this.sender}${this.recipient}${this.fee}${this.nonce}${this.timestamp}`;
     }
 
     private compute_tx_id(): string {
@@ -58,7 +54,7 @@ class Transaction {
             return true;
         }
 
-        const { amount, sender, recipient, fee, publicKey, signature, nonce, timestamp } = this;
+        const { amount, sender, recipient, fee, signature, nonce, timestamp } = this;
 
         if (amount === undefined || !sender || !recipient || fee === undefined || !signature || nonce === undefined || timestamp === undefined) {
             throw new Error("Incomplete transaction data.")
@@ -78,31 +74,11 @@ class Transaction {
             const s = compact_sig.slice(32, 64);
             const tx_signature = { r, s };
             const hashed_tx = hash_tobuf(tx_data_str);
-            const key = ec.keyFromPublic(publicKey, 'hex');
+            const key = ec.keyFromPublic(this.sender, 'hex');
             
             return key.verify(hashed_tx, tx_signature);
         } catch (err) {
             throw new Error('Transaction signature verification failed');
-        }
-    }
-
-    sign_tx(priv_key: PrivKey): Transaction {
-        try {
-            const data_str = this.get_signing_data();
-            
-            const hashed_tx = hash_tobuf(data_str);
-            const key_pair = ec.keyFromPrivate(priv_key, 'hex');
-            const sig = key_pair.sign(hashed_tx, 'hex');
-            const r = sig.r.toArrayLike(Buffer, 'be', 32);
-            const s = sig.s.toArrayLike(Buffer, 'be', 32);
-            const compact_sig = Buffer.concat([r, s]);
-            const sign = base58.encode(compact_sig);
-
-            this.signature = sign;
-
-            return this;
-        } catch (err) {
-            throw new Error('Unable to sign transaction');
         }
     }
 
