@@ -1,12 +1,8 @@
-import base58 from "bs58";
-import elliptic_pkg from 'elliptic';
+import { secp256k1 } from "@noble/curves/secp256k1.js";
+import { hexToBytes } from "@noble/curves/utils.js";
 import type { PubKey } from "bc-web3js";
 import { MAX_TIME_DIFF_TX, BC_NAME } from "../utils/constants.js";
 import { hash_tobuf, hash_tostr } from "../utils/crypto.js";
-
-
-const  { ec: EC } = elliptic_pkg;
-const ec = new EC('secp256k1');
 
 
 class Transaction {
@@ -66,17 +62,9 @@ class Transaction {
             }
 
             const tx_data_str = this.get_signing_data();
-        
-            const base58_sig = signature
-            const compact_sig = base58.decode(base58_sig);
-
-            const r = compact_sig.slice(0, 32);
-            const s = compact_sig.slice(32, 64);
-            const tx_signature = { r, s };
             const hashed_tx = hash_tobuf(tx_data_str);
-            const key = ec.keyFromPublic(this.sender, 'hex');
             
-            return key.verify(hashed_tx, tx_signature);
+            return secp256k1.verify(hexToBytes(signature), hashed_tx, hexToBytes(sender));
         } catch (err) {
             throw new Error('Transaction signature verification failed');
         }
