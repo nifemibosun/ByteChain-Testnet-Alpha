@@ -1,4 +1,4 @@
-import type { Address } from "bc-web3js";
+import type { PubKey } from "bc-web3js";
 import {
     BLOCK_REWARD, BLOCK_TIME_DIFF,
     MIN_DIFFICULTY, MAX_DIFFICULTY,
@@ -8,8 +8,24 @@ import {
 } from "../utils/constants.js";
 import Transaction from "./transaction.js";
 import Block from "./block.js";
+import fs from "fs";
 
 
+function read_gen_file(): Block {
+    try {
+        const file_path = "genesis_block.json";
+        const genesis_block = fs.readFileSync(file_path, "utf-8");
+        const genesis_block_obj: Block = JSON.parse(genesis_block);
+
+        return genesis_block_obj;
+    } catch (err) {
+        throw new Error("Unable to read data from genesis_block.json");
+    }
+}
+
+
+// The state of an account after an account has interacted with the blockchain, 
+// either by sending and receiving.
 interface AccState {
     nonce: number,
     balance: number,
@@ -19,23 +35,35 @@ class BlockChain {
     tx_pool: Transaction[];
     chain: Block[];
     difficulty: number = MIN_DIFFICULTY;
-    addr_state: Map<Address, AccState>;
+    addr_state: Map<PubKey, AccState>;
 
     constructor() {
         this.tx_pool = [];
         this.chain = [];
-        this.addr_state = new Map<Address, AccState>();
+        this.addr_state = new Map<PubKey, AccState>();
         this.genesis_block();
     }
 
     genesis_block() {
-        const gen_amount = 1000000000;
-        const gen_recipient = "BC-GEN";
-        const tx = new Transaction(gen_amount, BC_NAME, gen_recipient, 0, Date.now(), 0, "", "")
-        this.tx_pool.push(tx);
+        const gen_block = read_gen_file();
+
+        for (const transaction of gen_block.transactions) {
+            const tx = new Transaction(
+                transaction.amount,
+                transaction.sender,
+                BC_NAME,
+                transaction.fee,
+                transaction.timestamp,
+                transaction.nonce,
+                transaction.signature
+            )
+
+            this.tx_pool.push(tx);
+            this.credit_addr(transaction.recipient, transaction.amount);
+        }
+        
         const txs = this.tx_pool;
         const new_block = new Block(0, MIN_DIFFICULTY, GEN_PREV_HASH, txs);
-        this.credit_addr(gen_recipient, gen_amount);
         new_block.set_block_props();
 
         this.chain.push(new_block);
@@ -43,37 +71,37 @@ class BlockChain {
         this.difficulty = this.calc_difficulty();
     }
 
-    ensure_account(addr: Address) {
+    ensure_account(addr: PubKey) {
         if (!this.addr_state.has(addr)) {
             this.addr_state.set(addr, { nonce: 0, balance: 0 });
         }
     }
 
-    get_nonce(addr: Address) {
+    get_nonce(addr: PubKey) {
         this.ensure_account(addr);
         const state = this.addr_state.get(addr)!;
         return state.nonce;
     }
 
-    get_balance(addr: Address) {
+    get_balance(addr: PubKey) {
         this.ensure_account(addr);
         const state = this.addr_state.get(addr)!;
         return state.balance;
     }
 
-    update_nonce(addr: Address) {
+    update_nonce(addr: PubKey) {
         this.ensure_account(addr);
         const state = this.addr_state.get(addr)!;
         state.nonce += 1;
     }
 
-    credit_addr(addr: Address, amount: number) {
+    credit_addr(addr: PubKey, amount: number) {
         this.ensure_account(addr);
         const state = this.addr_state.get(addr)!;
         state.balance += amount;
     }
 
-    debit_addr(addr: Address, amount: number) {
+    debit_addr(addr: PubKey, amount: number) {
         this.ensure_account(addr);
         const state = this.addr_state.get(addr)!;
         if (state.balance < amount) throw new Error("Insufficient balance");
@@ -88,15 +116,15 @@ class BlockChain {
     get_multiple_blocks(start: number, end: number): Block[] {
         let latest_blocks: Block[] = [];
 
-        if ((start || end) < 0) {
-            throw new Error("Invalid chain index");
+        if (start >= end) {
+            throw new Error("start must be less than end")
         }
 
-        if (!this.chain[start] || !this.chain[end]) {
-            throw new Error("Chain is not long enough");
+        if (start < 0 || end < 0) {
+            return [...this.chain];
         }
 
-        for (let c = start; c <= this.chain[end].block_header.block_height; c++) {
+        for (let c = start; c < end; c++) {
             let c_block = this.chain[c];
             latest_blocks.push(c_block);
         }
@@ -105,16 +133,22 @@ class BlockChain {
     }
 
     calculate_dynamic_fee() {
-        const recent_blocks = this.get_multiple_blocks(this.chain.length - BLOCK_WINDOW_FEE, this.chain.length);
+        let fee = 0.1;
 
-        if (recent_blocks.length === 0) return 0.001;
-        
-        const avg_tx_count = recent_blocks.reduce((sum, b) => sum + b.transactions.length, 0) / BLOCK_WINDOW_FEE;
-        const base_fee = 0.001;
-        const congestion_factor = avg_tx_count / 100;
-        const fee = base_fee * (1 + congestion_factor);
+        if (this.chain.length - BLOCK_WINDOW_FEE >= 0) {
+            const recent_blocks = this.get_multiple_blocks(this.chain.length - BLOCK_WINDOW_FEE, this.chain.length);
 
-        return Math.min(fee, 0.1);
+            if (recent_blocks.length === 0) return 0.05;
+            
+            const avg_tx_count = recent_blocks.reduce((sum, b) => sum + b.transactions.length, 0) / recent_blocks.length;
+            const base_fee = 0.05;
+            const congestion_factor = avg_tx_count / 100;
+            const dynamic_fee = base_fee * (1 + congestion_factor);
+
+            fee = Math.min(dynamic_fee, fee);
+        }
+
+        return fee;
     }
 
     add_new_tx(tx: Transaction): Transaction {
@@ -155,7 +189,7 @@ class BlockChain {
             let t_fee = 0;
             for (const tx of this.tx_pool) t_fee += tx.fee;
 
-            const fee_tx = new Transaction(t_fee, BC_NAME, VANITY_ADDR, 0, Date.now(), 0, "", "");
+            const fee_tx = new Transaction(t_fee, BC_NAME, VANITY_ADDR, 0, Date.now(), 0, "");
             this.add_new_tx(fee_tx);
             const transactions = this.tx_pool;
             
@@ -174,9 +208,9 @@ class BlockChain {
         }
     }
 
-    mine_block(miner_addr: Address): Block {
+    mine_block(miner_addr: PubKey): Block {
         try {
-            const reward_tx = new Transaction(BLOCK_REWARD, BC_NAME, miner_addr, 0, Date.now(), 0, "", "");
+            const reward_tx = new Transaction(BLOCK_REWARD, BC_NAME, miner_addr, 0, Date.now(), 0, "");
 
             this.add_new_tx(reward_tx);
 

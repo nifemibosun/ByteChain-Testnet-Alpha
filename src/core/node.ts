@@ -2,7 +2,7 @@ import fs from "fs";
 import cors from "cors";
 import express from "express";
 import type { Request, Response } from "express";
-import { Account, type Address } from "bc-web3js";
+import { Account, type PubKey } from "bc-web3js";
 import P2PNode from "../network/p2p.js";
 import BlockChain from "./blockchain.js";
 import Transaction from "./transaction.js";
@@ -28,7 +28,7 @@ function read_file() {
 class BCNode {
     private p2p_port: number;
     private api_port: number;
-    private miner_addr: Address;
+    private miner_addr: PubKey;
     private bytechain: BlockChain;
     private p2p: P2PNode;
     public app: express.Application;
@@ -49,8 +49,8 @@ class BCNode {
         this.app.use(express.json());
 
         this.app.get("/new-account", (_: Request, res: Response) => {
-            const { priv_key, pub_key, blockchain_addr } = Account.new();
-            res.status(200).json({ priv_key, pub_key, blockchain_addr });
+            const { priv_key, pub_key } = Account.new();
+            res.status(200).json({ priv_key, pub_key });
         });
 
         this.app.post("/tx/send", async (req: Request, res: Response) => {
@@ -63,9 +63,8 @@ class BCNode {
                     tx_data.recipient,
                     tx_data.fee,
                     tx_data.timestamp,
-                    tx_data.publicKey,
-                    tx_data.signature,
-                    tx_data.nonce
+                    tx_data.nonce,
+                    tx_data.signature
                 );
 
                 const tx_result = this.bytechain.add_new_tx(new_tx);
@@ -78,7 +77,7 @@ class BCNode {
                         .json({ status: "error", msg: "Failed to add transaction. Invalid or Insufficient fund" });
                 }
             } catch (err: any) {
-                console.error(`Error processing /send_tx: ${err}`);
+                console.error(`Error sending transaction: ${err}`);
                 return res.status(500).json({ status: "error", msg: "Internal server error", details: err.message });
             }
         });
