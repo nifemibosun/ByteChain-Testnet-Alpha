@@ -35,9 +35,11 @@ class BCNode {
     public io?: Server;
 
     constructor() {
-        this.p2p_port = read_file().p2p_port;
-        this.api_port = read_file().api_port;
-        this.miner_addr = read_file().miner_addr;
+        const { miner_addr, p2p_port, api_port } = read_file();
+        
+        this.p2p_port = p2p_port;
+        this.api_port = api_port;
+        this.miner_addr = miner_addr;
         this.bytechain = new BlockChain();
         this.p2p = new P2PNode(this.bytechain);
         this.app = express();
@@ -200,16 +202,12 @@ class BCNode {
     pub_block() {
         try {
             const new_block = this.bytechain.mine_block(this.miner_addr);
-            if (new_block) {
-                this.p2p.publish_block(new_block);
-                if (this.io) {
-                    this.io.emit("blockMined", new_block);
-                }
-            } else {
-                console.error("Failed to mine block.");
-            }
+            this.p2p.publish_block(new_block);
+            this.io?.emit("blockMined", new_block);
         } catch (err: any) {
-            console.error(`Exception during block mining: ${err.message || err}`);
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`Mining error: ${msg}`);
+            this.io?.emit("miningError", { message: msg });
         }
     }
 }

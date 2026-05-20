@@ -13,9 +13,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 bc_node.io = io;
 
 async function main() {
-    await bc_node.start();
-
-    server.listen(3000, () => {});
+    await bc_node.start(server);
 
     setInterval(() => {
         bc_node.pub_block();
