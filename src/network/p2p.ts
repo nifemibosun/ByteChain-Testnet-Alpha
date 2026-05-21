@@ -6,7 +6,7 @@ import { yamux } from '@chainsafe/libp2p-yamux';
 import { identify } from '@libp2p/identify';
 import { kadDHT } from '@libp2p/kad-dht';
 import { bootstrap } from '@libp2p/bootstrap';
-import { gossipsub } from '@chainsafe/libp2p-gossipsub';
+import { gossipsub } from '@libp2p/gossipsub';
 import { mdns } from '@libp2p/mdns';
 import { ping } from '@libp2p/ping';
 import { lpStream } from 'it-length-prefixed-stream';
@@ -16,7 +16,7 @@ import Transaction from '../core/transaction.js';
 
 import { serialize_tx, deserialize_tx,
     serialize_block, deserialize_block
- } from '../utils/serialization.js';
+} from '../utils/serialization.js';
 import { print } from '../utils/constants.js';
 
 
@@ -81,7 +81,7 @@ class P2PNode {
                 const mempool_data = JSON.stringify(this.blockchain.tx_pool);
                 await lp.write(new TextEncoder().encode(mempool_data));
             } catch (err: any) {
-                console.error(`Error sharing mempool: ${err}`)
+                console.error(`Error sharing mempool: ${err instanceof Error ? err.message : err}`)
             } finally {
                 stream.close();
             }
@@ -107,8 +107,8 @@ class P2PNode {
                         await lp.write(new TextEncoder().encode(JSON.stringify({ blocks: blocks_to_send })));
                     }
                 }
-            } catch (err) {
-                console.error(`Error syncing chain: ${err}`)
+            } catch (err: any) {
+                console.error(`Error syncing chain: ${err instanceof Error ? err.message : err}`)
             } finally {
                 await stream.close();
             }
@@ -116,8 +116,6 @@ class P2PNode {
 
         this.node.addEventListener('peer:connect', async (evt: any) => {
             const peer_id = evt.detail;
-            await this.sync_remote_chain(peer_id);
-            await this.request_mempool(peer_id);
             print(`Connected to: ${peer_id.toString()}`);
         });
 
@@ -154,10 +152,10 @@ class P2PNode {
         this.node.services.pubsub.subscribe('bytechain:blocks');
         print('Subscribed to GossipSub topics');
 
-        this.node.services.pubsub.addEventListener('message', (evt: any) => {
+        this.node.services.pubsub.addEventListener('message', async (evt: any) => {
             if (evt.detail.from.toString() === this.node.peerId.toString()) return;
 
-            const { topic, data } = evt.detail;
+            const { topic, data, from: from_peer } = evt.detail;
             const message_string = new TextDecoder().decode(data);
             let message: any;
 
@@ -186,12 +184,17 @@ class P2PNode {
                     print("Received new block from peer");
                     try {
                         const received_block = deserialize_block(message);
-                        
-                        if (received_block.block_header.block_height > this.blockchain.get_latest_block().block_header.block_height) {
-                            print(`Syncing block ${received_block.block_header.block_height}...`);
+                        const local_height = this.blockchain.get_latest_block().block_header.block_height;
+                        const peer_height = received_block.block_header.block_height;
+
+                        if (peer_height > local_height) {
+                            print(`Peer block height (${peer_height}) is ahead of local (${local_height}). Requesting sync...`);
+                            await this.sync_remote_chain(from_peer);
+                        } else {
+                            print(`Block at height ${peer_height} already known, ignoring.`);
                         }
                     } catch (error: any) {
-                        console.error('Processing Block Error:', error.message);
+                        console.error(`Processing Block Error: ${error.message}`);
                     }
                     break;
                 default:

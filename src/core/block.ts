@@ -46,7 +46,7 @@ class Block {
 
             return { n_nonce, hash };
         } catch (err) {
-            throw new Error('Unable to set block property')            
+            throw new Error(`Unable to set block property: ${err instanceof Error ? err.message : err}`);            
         }
     }
 

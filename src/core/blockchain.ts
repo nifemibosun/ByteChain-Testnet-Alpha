@@ -50,12 +50,12 @@ class BlockChain {
         for (const transaction of gen_block.transactions) {
             const tx = new Transaction(
                 transaction.amount,
-                transaction.sender,
                 BC_NAME,
+                transaction.recipient,
                 transaction.fee,
                 transaction.timestamp,
                 transaction.nonce,
-                transaction.signature
+                ""
             )
 
             this.tx_pool.push(tx);
@@ -114,28 +114,30 @@ class BlockChain {
     }
 
     get_multiple_blocks(start: number, end: number): Block[] {
-        let latest_blocks: Block[] = [];
+        if (start < 0 || end < 0) {
+            throw new Error("start and end must be non-negative");
+        }
 
         if (start >= end) {
-            throw new Error("start must be less than end")
+            throw new Error("start must be less than end");
         }
 
-        if (start < 0 || end < 0) {
-            return [...this.chain];
+        if (end > this.chain.length) {
+            throw new Error(`end (${end}) exceeds chain length (${this.chain.length})`);
         }
 
+        let latest_blocks: Block[] = [];
         for (let c = start; c < end; c++) {
-            let c_block = this.chain[c];
-            latest_blocks.push(c_block);
+            latest_blocks.push(this.chain[c]);
         }
-        
+
         return latest_blocks;
     }
 
     calculate_dynamic_fee() {
         let fee = 0.1;
 
-        if (this.chain.length - BLOCK_WINDOW_FEE >= 0) {
+        if (this.chain.length >= BLOCK_WINDOW_FEE) {
             const recent_blocks = this.get_multiple_blocks(this.chain.length - BLOCK_WINDOW_FEE, this.chain.length);
 
             if (recent_blocks.length === 0) return 0.05;
@@ -184,27 +186,19 @@ class BlockChain {
     add_new_block(): Block {
         try {
             const { block_height, block_hash } = this.get_latest_block().block_header;
-            const n_block_height = block_height + 1;
-
             let t_fee = 0;
+
             for (const tx of this.tx_pool) t_fee += tx.fee;
 
             const fee_tx = new Transaction(t_fee, BC_NAME, VANITY_ADDR, 0, Date.now(), 0, "");
-            this.add_new_tx(fee_tx);
-            const transactions = this.tx_pool;
-            
-            for (const tx of transactions) {
-                this.update_nonce(tx.sender);
-                this.credit_addr(tx.recipient, tx.amount);
-            }
+            this.tx_pool.push(fee_tx);
 
-            const block = new Block(n_block_height, this.difficulty, block_hash, transactions);
-
+            const transactions = [...this.tx_pool];
+            const block = new Block(block_height + 1, this.difficulty, block_hash, transactions);
             this.tx_pool = [];
-
             return block;
         } catch (err) {
-            throw new Error('Unable to add a new block to the chain');
+            throw new Error(`Unable to add a new block to the chain: ${err instanceof Error ? err.message : err}`);
         }
     }
 
@@ -212,17 +206,22 @@ class BlockChain {
         try {
             const reward_tx = new Transaction(BLOCK_REWARD, BC_NAME, miner_addr, 0, Date.now(), 0, "");
 
-            this.add_new_tx(reward_tx);
+            this.tx_pool.push(reward_tx);
 
             const new_block = this.add_new_block();
             new_block.set_block_props();
 
+            for (const tx of new_block.transactions) {
+                this.update_nonce(tx.sender);
+                this.credit_addr(tx.recipient, tx.amount);
+            }
+
             this.chain.push(new_block);
             this.difficulty = this.calc_difficulty();
-
+            
             return new_block;
         } catch (err) {
-            throw new Error("Error mining block");
+            throw new Error(`Error mining block: ${err instanceof Error ? err.message : err}`);
         }
     }
 
@@ -244,7 +243,7 @@ class BlockChain {
 
             return this.difficulty;
         } catch (err) {
-            throw new Error("Error calculating difficulty");
+            throw new Error(`Error calculating difficulty: ${err instanceof Error ? err.message : err}`);
         }
     }
 
@@ -256,27 +255,24 @@ class BlockChain {
     }
 
     sync_chain(remote: Block[]) {
-        let local = this.chain;
+        if (remote.length <= this.chain.length) return;
 
-        if (remote.length > this.chain.length) {
-            BlockChain.is_valid_chain(remote);
-            this.addr_state.clear();
+        BlockChain.is_valid_chain(remote);
+        this.addr_state.clear();
 
-            for (const block of remote) {
-                for (const tx of block.transactions) {
-                    if (tx.sender === BC_NAME) {
-                        this.credit_addr(tx.recipient, tx.amount);
-                    }
-
-                    this.update_nonce(tx.sender);
+        for (const block of remote) {
+            for (const tx of block.transactions) {
+                if (tx.sender !== BC_NAME) {
                     this.debit_addr(tx.sender, tx.amount + tx.fee);
-                    this.credit_addr(tx.recipient, tx.amount);
                 }
+                this.update_nonce(tx.sender);
+                this.credit_addr(tx.recipient, tx.amount);
             }
-            this.chain = remote;
         }
 
-        this.chain = local;
+        this.chain = remote;
+        this.difficulty = this.calc_difficulty();
+        this.tx_pool = [];
     }
 }
 

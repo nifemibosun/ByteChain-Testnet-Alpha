@@ -1,6 +1,6 @@
 {
     "name": "bytechain-testnet-alpha",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "This is the first testnet of the bytechain network",
     "type": "module",
     "scripts": {
@@ -17,27 +17,29 @@
     "author": "ByteChain-Labs",
     "license": "Apache-2.0",
     "dependencies": {
-        "@chainsafe/libp2p-gossipsub": "^14.1.1",
-        "@chainsafe/libp2p-noise": "^16.1.4",
-        "@chainsafe/libp2p-yamux": "^7.0.4",
-        "@libp2p/bootstrap": "^11.0.46",
-        "@libp2p/identify": "^3.0.38",
-        "@libp2p/kad-dht": "^15.1.10",
-        "@libp2p/mdns": "^11.0.46",
-        "@libp2p/tcp": "^10.1.17",
-        "@libp2p/websockets": "^9.2.18",
+        "@chainsafe/libp2p-gossipsub": "^14.1.2",
+        "@chainsafe/libp2p-noise": "^17.0.0",
+        "@chainsafe/libp2p-yamux": "^8.0.1",
+        "@libp2p/bootstrap": "^12.0.22",
+        "@libp2p/gossipsub": "^15.0.23",
+        "@libp2p/identify": "^4.1.6",
+        "@libp2p/kad-dht": "^16.2.7",
+        "@libp2p/mdns": "^12.0.22",
+        "@libp2p/ping": "^3.1.5",
+        "@libp2p/tcp": "^11.0.20",
+        "@libp2p/websockets": "^10.1.13",
         "@noble/curves": "^2.2.0",
         "bc-web3js": "^3.2.0",
-        "cors": "^2.8.5",
-        "express": "^5.1.0",
-        "it-length-prefixed-stream": "^2.0.4",
-        "libp2p": "^2.8.12",
-        "socket.io": "^4.8.1"
+        "cors": "^2.8.6",
+        "express": "^5.2.1",
+        "it-length-prefixed-stream": "^3.0.0",
+        "libp2p": "^3.3.1",
+        "socket.io": "^4.2.0"
     },
     "devDependencies": {
         "@types/cors": "^2.8.19",
-        "@types/express": "^5.0.3",
-        "@types/node": "^24.0.8",
-        "typescript": "^5.6.3"
+        "@types/express": "^5.0.6",
+        "@types/node": "^25.9.1",
+        "typescript": "^6.0.3"
     }
 }
