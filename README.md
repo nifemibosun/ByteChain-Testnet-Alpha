@@ -1,4 +1,4 @@
-# ByteChain: Testnet Alpha (v0.2.0)
+# ByteChain: Testnet Alpha (v0.2.2)
 
 **Warning:** ByteChain is in active development. Features are subject to change, and this Testnet Alpha should be used for experimental purposes only. Your feedback is highly appreciated!
 
@@ -49,7 +49,7 @@ To run a ByteChain Testnet Alpha node locally, follow these steps:
     npm run bc-node
     ```
 
-## Usage (Under Development)
+## Usage
 
 ### Interacting via HTTP API:
 
@@ -65,7 +65,7 @@ Each running node exposes an HTTP API for client interaction. You can use tools 
     Transactions **must be signed on the client-side** using the sender's private key. The API expects the complete, signed transaction object.
     ```bash
     curl -X POST -H "Content-Type: application/json" -d '{
-        "amount": 10,
+        "amount": AMOUNT_TO_SEND,
         "sender": "SENDER_BYTECHAIN_ADDRESS",
         "recipient": "RECIPIENT_BYTECHAIN_ADDRESS",
         "fee": FEE_YOU_CAN_PAY,
@@ -73,11 +73,6 @@ Each running node exposes an HTTP API for client interaction. You can use tools 
         "signature": "TRANSACTION_SIGNATURE",
         "nonce": SENDER_NONCE
     }' http://localhost:3001/tx/send
-    ```
-* **Trigger a Manual Block Mine (For Testing/Debugging Only)**:
-    While nodes mine automatically, this endpoint can be used to force a block mine immediately for testing purposes, rather than waiting for the automatic interval.
-    ```bash
-    curl -X POST -H "Content-Type: application/json" -d '{"minerAddress": "YOUR_MINER_BYTECHAIN_ADDRESS"}' http://localhost:3001/mine
     ```
 
 ### Node Operations:

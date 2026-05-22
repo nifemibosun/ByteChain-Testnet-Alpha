@@ -71,7 +71,6 @@ class P2PNode {
 
         this.node.addEventListener('peer:discovery', (evt: any) => {
             const peer_id = evt.detail.id;
-            print(`Discovered peer: ${peer_id}`);
             this.node.dial(peer_id).catch((_: any) => {});
         });
 
@@ -115,8 +114,7 @@ class P2PNode {
         });
 
         this.node.addEventListener('peer:connect', async (evt: any) => {
-            const peer_id = evt.detail;
-            print(`Connected to: ${peer_id.toString()}`);
+            evt.detail;
         });
 
         this.node.addEventListener('peer:identify', async (evt: any) => {
@@ -132,13 +130,11 @@ class P2PNode {
         });
 
         this.node.addEventListener('peer:disconnect', (evt: any) => {
-            const peer_id = evt.detail;
-            print(`Disconnected from peer: ${peer_id.toString()}`);
+            evt.detail;
         });
 
         await this.node.start();
         print(`ByteChain P2P Node started with peer ID: ${this.node.peerId.toString()}`);
-        print(`Listening on: ${this.node.getMultiaddrs().map((ma: any) => ma.toString())}`);
         await this.subscribe_to_topics();
     }
 
@@ -150,7 +146,6 @@ class P2PNode {
     async subscribe_to_topics() {
         this.node.services.pubsub.subscribe('bytechain:transactions');
         this.node.services.pubsub.subscribe('bytechain:blocks');
-        print('Subscribed to GossipSub topics');
 
         this.node.services.pubsub.addEventListener('message', async (evt: any) => {
             if (evt.detail.from.toString() === this.node.peerId.toString()) return;
