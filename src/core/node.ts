@@ -21,7 +21,7 @@ function read_file() {
 
         return { miner_addr, p2p_port, api_port };
     } catch (err) {
-        throw new Error("Unable to read data from bc-setup.json");
+        throw new Error(`Unable to read data from bc-setup.json: ${err}`);
     }
 }
 
@@ -70,16 +70,16 @@ class BCNode {
                 );
 
                 const tx_result = this.bytechain.add_new_tx(new_tx);
+
                 if (tx_result) {
                     this.p2p.publish_tx(new_tx);
-                    return res.status(200).json({ status: "success", msg: `Tx id: ${new_tx.tx_id}` });
-                } else {
-                    return res
-                        .status(200)
-                        .json({ status: "error", msg: "Failed to add transaction. Invalid or Insufficient fund" });
+                    return res.status(200).json({ status: "success", msg: `tx_id: ${new_tx.tx_id}` });
                 }
+
+                return res
+                    .status(200)
+                    .json({ status: "error", msg: "Failed to add transaction. Invalid or Insufficient fund" });
             } catch (err: any) {
-                console.error(`Error sending transaction: ${err}`);
                 return res.status(500).json({ status: "error", msg: "Internal server error", details: err.message });
             }
         });
@@ -190,15 +190,6 @@ class BCNode {
         print("P2P and HTTP server stopped");
     }
 
-    pub_tx(tx: Transaction) {
-        const result = this.bytechain.add_new_tx(tx);
-        if (result) {
-            this.p2p.publish_tx(tx);
-        } else {
-            console.error("Failed to add transaction to tx_pool.");
-        }
-    }
-
     pub_block() {
         try {
             const new_block = this.bytechain.mine_block(this.miner_addr);
@@ -206,7 +197,6 @@ class BCNode {
             this.io?.emit("blockMined", new_block);
         } catch (err: any) {
             const msg = err instanceof Error ? err.message : String(err);
-            console.error(`Mining error: ${msg}`);
             this.io?.emit("miningError", { message: msg });
         }
     }
